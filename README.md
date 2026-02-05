@@ -59,6 +59,8 @@ You will need the following development libraries:
 ### Compiling Sudoku-Pro:
 
 ```bash
+git clone https://github.com/bored-hell/Sudoku-Pro.git
+cd Sudoku-Pro
 mkdir build
 cd build
 cmake ..
