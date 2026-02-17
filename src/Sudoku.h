@@ -8,6 +8,7 @@
 #include <atomic>
 #include <thread>
 #include <memory>
+#include <string_view>
 
 class TextureManager;
 
@@ -38,7 +39,7 @@ class Sudoku {
     void showHud();
     void showPauseScreen();
     void showWinScreen();
-    void showLoadingScreen();
+    void showOverlayMessage(std::string_view mainText, std::string_view subText, SDL_Color textColor);
     void showNumberStats();
   private:
     void generatePuzzleTask();

@@ -14,7 +14,8 @@ file(GLOB SOURCES "src/*.cpp" "src/imgui/*.cpp")
 
 add_executable(sudoku ${SOURCES})
 
-add_compile_options(-O2 -s)
+add_compile_options(-g)
+
 add_custom_command(
   TARGET sudoku POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory

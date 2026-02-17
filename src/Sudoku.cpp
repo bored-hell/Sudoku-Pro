@@ -158,7 +158,11 @@ void Sudoku::render() {
     SDL_RenderClear(renderer);
     renderUI();
   } else if (isGenerating) {
-    showLoadingScreen();
+    showOverlayMessage("Generating Puzzle...", "Sip some coffee while the game is generating", { 0xFF, 0xFF, 0xFF });
+  } else if (maxMistakes > 0 && mistakeCount >= maxMistakes) {
+    std::string finalTime = std::format("Time Survived: {:02d}:{:02d}",
+                                        finalElapsedDuration.count() / 60, finalElapsedDuration.count() % 60);
+    showOverlayMessage("GAME OVER", finalTime + " | Press \'N\' for Menu", { 0xFF, 0x32, 0x32 });
   } else {
     highlightGrid();
     showGridLines();
@@ -271,7 +275,9 @@ void Sudoku::update() {
     return;
   }
 
-  if (!isPuzzleSolved && !isPaused) {
+  bool isGameOver = (maxMistakes > 0 && mistakeCount >= maxMistakes);
+
+  if (!isPuzzleSolved && !isPaused && !isGameOver) {
     auto now = std::chrono::steady_clock::now();
     auto totalSinceStart = now - startTime;
     finalElapsedDuration = std::chrono::duration_cast<std::chrono::seconds>(totalSinceStart - totalPausedDuration);
@@ -392,9 +398,9 @@ void Sudoku::handleMouseEvents() {
     selectedCol = -1;
   }
 
-  if (selectedRow != oldRow || selectedRow != oldCol) {
-    Mix_PlayChannel(-1, moveSound, 0);
-  }
+  // if (selectedRow != oldRow || selectedRow != oldCol) {
+  //   Mix_PlayChannel(-1, moveSound, 0);
+  // }
 }
 
 void Sudoku::handleKeyboardEvents(int key) {
@@ -448,9 +454,6 @@ void Sudoku::handleKeyboardEvents(int key) {
     if (key == SDLK_s) {
       if (solveSudoku(board)) {
         isPuzzleSolved = true;
-        std::cout << "Puzzle solved successfully.\n";
-      } else {
-        std::cout << "Puzzle is unsolvable.\n";
       }
     }
 
@@ -669,8 +672,15 @@ void Sudoku::showHud() {
   else if (targetClues >= 20) diffText += "Hard";
   else                        diffText += "Expert";
 
-  std::string hudString = std::format("Mistakes: {} | Time: {:02d}:{:02d} | Level: {}",
-                                      mistakeCount, minutes, seconds, diffText);
+  std::string mistakeStr;
+  if (maxMistakes > 0) {
+    mistakeStr = std::format("Mistakes: {}/{}", mistakeCount, maxMistakes);
+  } else {
+    mistakeStr = std::format("Mistakes: {}", mistakeCount);
+  }
+
+  std::string hudString = std::format("{} | Time: {:02d}:{:02d} | Level: {}",
+                                      mistakeStr, minutes, seconds, diffText);
   
   SDL_Color hudColor = { 0x8F, 0x00, 0xFF, 0xFF };
 
@@ -764,7 +774,7 @@ void Sudoku::showWinScreen() {
   SDL_DestroyTexture(subTexture);
 }
 
-void Sudoku::showLoadingScreen() {
+void Sudoku::showOverlayMessage(std::string_view mainText, std::string_view subText, SDL_Color textColor) {
   SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0x8C);
   SDL_Rect fullScreen = { 0, 0, windowWidth, windowHeight };
   SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
@@ -772,24 +782,40 @@ void Sudoku::showLoadingScreen() {
 
   auto now = std::chrono::steady_clock::now().time_since_epoch().count();
   float pulse = (std::sin(now / 100'000'000.f) + 1.f) / 2.f;
-  Uint8 alpha = static_cast<Uint8>(150 + (105 * pulse));
+  textColor.a = static_cast<Uint8>(150 + (105 * pulse));
 
-  SDL_Color textColor = { 0xFF, 0xFF, 0xFF, alpha };
+  // SDL_Color textColor = { 0xFF, 0xFF, 0xFF, alpha };
   TTF_SetFontSize(font, 28);
 
-  const char message[] = "Generating Puzzle...";
-  SDL_Surface *surface = TTF_RenderText_Blended(font, message, textColor);
-  SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
-  SDL_Rect textQuad = {
-    (windowWidth - surface->w) / 2,
-    (windowHeight - surface->h) / 2,
-    surface->w, surface->h
+  // const char message[] = "Generating Puzzle...";
+  SDL_Surface *mainSurface = TTF_RenderText_Blended(font, mainText.data(), textColor);
+  SDL_Texture *mainTexture = SDL_CreateTextureFromSurface(renderer, mainSurface);
+  SDL_Rect mainQuad = {
+    (windowWidth - mainSurface->w) / 2,
+    (windowHeight - mainSurface->h) / 2,
+    mainSurface->w, mainSurface->h
   };
 
-  SDL_RenderCopy(renderer, texture, nullptr, &textQuad);
+  SDL_RenderCopy(renderer, mainTexture, nullptr, &mainQuad);
+  SDL_FreeSurface(mainSurface);
+  SDL_DestroyTexture(mainTexture);
 
-  SDL_FreeSurface(surface);
-  SDL_DestroyTexture(texture);
+  if (!subText.empty()) {
+    TTF_SetFontSize(font, 20);
+    SDL_Color subColor = { 0xC8, 0xC8, 0xC8, 0xFF };
+    SDL_Surface *subSurface = TTF_RenderText_Blended(font, subText.data(), subColor);
+    SDL_Texture *subTexture = SDL_CreateTextureFromSurface(renderer, subSurface);
+    SDL_Rect subQuad = {
+      (windowWidth - subSurface->w) / 2,
+      mainQuad.y + mainQuad.h + 20,
+      subSurface->w, subSurface->h
+    };
+
+    SDL_RenderCopy(renderer, subTexture, nullptr, &subQuad);
+    SDL_FreeSurface(subSurface);
+    SDL_DestroyTexture(subTexture);
+  }
+
   TTF_SetFontSize(font, FONT_SIZE);
 }
 
