@@ -41,6 +41,8 @@ class Sudoku {
     void showWinScreen();
     void showOverlayMessage(std::string_view mainText, std::string_view subText, SDL_Color textColor);
     void showNumberStats();
+    void loadScores();
+    void saveScores();
   private:
     void generatePuzzleTask();
   private:
@@ -84,6 +86,13 @@ class Sudoku {
     int cellSize = 0;
     int offsetX = 0;
     int offsetY = 0;
+    int lockedNumber = 0;
+
+    struct BestTimes {
+      int easy = 99999;
+      int medium = 99999;
+      int hard = 99999;
+    } bestTimes{};
   private:
     std::atomic_bool isGenerating = false;
     std::thread generationThread;

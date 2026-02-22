@@ -7,6 +7,7 @@
 #include "imgui/imgui_impl_sdlrenderer2.h"
 
 #include <iostream>
+#include <fstream>
 #include <random>
 
 #include <SDL2/SDL.h>
@@ -100,6 +101,8 @@ bool Sudoku::init() {
 
   ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
   ImGui_ImplSDLRenderer2_Init(renderer);
+
+  loadScores();
   return true;
 }
 
@@ -186,7 +189,7 @@ void Sudoku::renderUI() {
 
   ImGui::NewFrame();
 
-  ImVec2 menuSize = ImVec2(windowWidth * 0.6f, windowHeight * 0.5f);
+  ImVec2 menuSize = ImVec2(windowWidth * 0.6f, windowHeight * 0.6f);
   ImGui::SetNextWindowPos(ImVec2(windowWidth * 0.5f, windowHeight * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
   ImGui::SetNextWindowSize(menuSize, ImGuiCond_Always);
   ImGui::Begin("Main Menu", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
@@ -247,9 +250,7 @@ void Sudoku::renderUI() {
   ImGui::SetCursorPosX((windowWidthIm - ImGui::CalcTextSize("Hard").x - 10.f) * 0.5f);
   if (ImGui::RadioButton("Hard", targetClues == 25)) targetClues = 25;
 
-  ImGui::Dummy(ImVec2(0.f, 50.f));
-
-  ImGui::Spacing();
+  ImGui::Dummy(ImVec2(0.f, 10.f));
 
   ImGui::SetCursorPosX((windowWidthIm - buttonWidth) * 0.5f);
   if (ImGui::Button("START NEW GAME", ImVec2(buttonWidth, 0))) {
@@ -262,7 +263,21 @@ void Sudoku::renderUI() {
     isRunning = false;
   }
 
-  ImGui::SetWindowFontScale(1.f);
+  auto formatTime = [](int totalSeconds) -> std::string {
+    if (totalSeconds >= 99999) return "--:--";
+    return std::format("{:02d}:{:02d}", totalSeconds/60, totalSeconds%60);
+  };
+
+  ImGui::Spacing();
+  ImGui::Separator();
+  ImGui::Text("Personal Bests:");
+  ImGui::Columns(2, "BestTimesColumns", false);
+  ImGui::Text("Easy: %s", formatTime(bestTimes.easy).c_str());
+  ImGui::Text("Medium: %s", formatTime(bestTimes.medium).c_str());
+  ImGui::NextColumn();
+  ImGui::Text("Hard: %s", formatTime(bestTimes.hard).c_str());
+  ImGui::Columns(1);
+
   ImGui::End();
 
   ImGui::Render();
@@ -282,6 +297,29 @@ void Sudoku::update() {
     auto totalSinceStart = now - startTime;
     finalElapsedDuration = std::chrono::duration_cast<std::chrono::seconds>(totalSinceStart - totalPausedDuration);
   }
+
+  static bool scoreProcessed = false;
+
+  if (isPuzzleSolved && !scoreProcessed) {
+    int currentSeconds = static_cast<int>(finalElapsedDuration.count());
+    bool newRecord = false;
+
+    if (targetClues >= 40 && currentSeconds < bestTimes.easy) {
+      bestTimes.easy = currentSeconds;
+      newRecord = true;
+    } else if (targetClues >= 30 && currentSeconds < bestTimes.medium) {
+      bestTimes.medium = currentSeconds;
+      newRecord = true;
+    } else if (targetClues >= 20 && currentSeconds < bestTimes.hard) {
+      bestTimes.hard = currentSeconds;
+      newRecord = true;
+    }
+
+    if (newRecord) saveScores();
+    scoreProcessed = true;
+  }
+
+  if (!isPuzzleSolved) scoreProcessed = false;
 }
 
 int Sudoku::run() {
@@ -398,9 +436,11 @@ void Sudoku::handleMouseEvents() {
     selectedCol = -1;
   }
 
-  // if (selectedRow != oldRow || selectedRow != oldCol) {
-  //   Mix_PlayChannel(-1, moveSound, 0);
-  // }
+  if (selectedRow != oldRow || selectedRow != oldCol) {
+    if (!isShowingMenu) {
+      Mix_PlayChannel(-1, moveSound, 0);
+    }
+  }
 }
 
 void Sudoku::handleKeyboardEvents(int key) {
@@ -486,6 +526,8 @@ void Sudoku::handleNumericKeys(int key) {
   if (selectedRow != -1 && selectedCol != -1) {
     if (key >= SDLK_1 && key <= SDLK_9) {
       enteredValue = key - SDLK_0;
+    } else if (key >= SDLK_KP_1 && key <= SDLK_KP_9) {
+      enteredValue = key - SDLK_KP_1 + 1;
     } else if (key == SDLK_DELETE || key == SDLK_BACKSPACE) {
       enteredValue = 0;
     }
@@ -866,6 +908,24 @@ void Sudoku::showNumberStats() {
     TTF_SetFontSize(font, 24);
   }
   TTF_SetFontSize(font, FONT_SIZE);
+}
+
+void Sudoku::loadScores() {
+  std::ifstream file("bestTimes.dat");
+  if (file.is_open()) {
+    file >> bestTimes.easy >> bestTimes.medium >> bestTimes.hard;
+    file.close();
+  } else {
+    saveScores();
+  }
+}
+
+void Sudoku::saveScores() {
+  std::ofstream file("bestTimes.dat");
+  if (file.is_open()) {
+    file << bestTimes.easy << ' ' << bestTimes.medium << ' ' << bestTimes.hard << ' ';
+    file.close();
+  }
 }
 
 void Sudoku::generatePuzzleTask() {
