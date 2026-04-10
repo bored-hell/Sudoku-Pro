@@ -6,7 +6,7 @@
 #include <cstdint>
 
 #define FWD_DECL(x) using x = struct x
-#define RGBA(x) x.r, x.g, x.b, x.a
+#define RGBA(x) (x).r, (x).g, (x).b, (x).a
 
 constexpr char FONT_NAME[] = "res/Roboto.ttf";
 constexpr int FONT_SIZE = 40;
